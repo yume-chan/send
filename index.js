@@ -108,7 +108,10 @@ async function send (ctx, path, opts = {}) {
     // and not require a trailing slash for directories,
     // so that you can do both `/directory` and `/directory/`
     if (stats.isDirectory()) {
-      if (format && index) {
+      if (!format) {
+        ctx.url += '/'
+        return
+      } else if (index) {
         path += '/' + index
         stats = await fs.stat(path)
       } else {
@@ -146,7 +149,7 @@ async function send (ctx, path, opts = {}) {
  * Check if it's hidden.
  */
 
-function isHidden (root, path) {
+function isHidden(root, path) {
   path = path.substr(root.length).split(sep)
   for (let i = 0; i < path.length; i++) {
     if (path[i][0] === '.') return true
@@ -158,7 +161,7 @@ function isHidden (root, path) {
  * File type.
  */
 
-function type (file, ext) {
+function type(file, ext) {
   return ext !== '' ? extname(basename(file, ext)) : extname(file)
 }
 
@@ -166,7 +169,7 @@ function type (file, ext) {
  * Decode `path`.
  */
 
-function decode (path) {
+function decode(path) {
   try {
     return decodeURIComponent(path)
   } catch (err) {
