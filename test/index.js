@@ -205,7 +205,7 @@ describe('send(ctx, file)', function () {
 
       request(app.listen())
       .get('/')
-      .expect(404, done)
+      .expect(302, done)
     })
   })
 
@@ -224,7 +224,7 @@ describe('send(ctx, file)', function () {
   })
 
   describe('when path does not finish with slash and format is disabled', function () {
-    it('should 404', function (done) {
+    it('should 302', function (done) {
       const app = new Koa()
 
       app.use(async (ctx) => {
@@ -234,10 +234,10 @@ describe('send(ctx, file)', function () {
 
       request(app.listen())
         .get('/world')
-        .expect(404, done)
+        .expect(302, done)
     })
 
-    it('should 404', function (done) {
+    it('should 302', function (done) {
       const app = new Koa()
 
       app.use(async (ctx) => {
@@ -247,7 +247,7 @@ describe('send(ctx, file)', function () {
 
       request(app.listen())
         .get('/world')
-        .expect(404, done)
+        .expect(302, done)
     })
   })
 
