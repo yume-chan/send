@@ -29,6 +29,21 @@ $ npm install koa-send
  - [`setHeaders`](#setheaders) Function to set custom headers on response.
  - `extensions` Try to match extensions from passed array to search for file when no extension is sufficed in URL. First found is served. (defaults to `false`)
 
+### Path resolution
+
+1. if the path ends with `/`
+    * if `index` option is not provided, return 404
+    * else, append `index` value to the path
+2. if the path points to a hidden file, return
+3. if the path does not exist but `extensions` option is provided
+    * try to append `extensions` to the path to find a match
+4. if either `brotli` or `gzip` option is `true`
+    * find the compressed file by appending extension `.br` or `.gz` respectively
+5. if a matching file still cannot be found, but the path points to a directory
+    * if `format` option is `false`, redirect to `path + '/'`
+    * else, if `index` option is provided and match a file, use it
+6. If still no matching file found, return 404
+
 ### Root path
 
   Note that `root` is required, defaults to `''` and will be resolved,
