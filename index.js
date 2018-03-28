@@ -109,7 +109,7 @@ async function send (ctx, path, opts = {}) {
     // so that you can do both `/directory` and `/directory/`
     if (stats.isDirectory()) {
       if (!format) {
-        ctx.url += '/'
+        ctx.redirect(ctx.url + '/');
         return
       } else if (index) {
         path += '/' + index
