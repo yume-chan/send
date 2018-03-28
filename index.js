@@ -30,11 +30,11 @@ module.exports = send
  * @param {Context} ctx
  * @param {String} path
  * @param {Object} [opts]
- * @return {Function}
+ * @return {Promise}
  * @api public
  */
 
-async function send (ctx, path, opts = {}) {
+async function send(ctx, path, opts = {}) {
   assert(ctx, 'koa context required')
   assert(path, 'pathname required')
 
@@ -42,7 +42,6 @@ async function send (ctx, path, opts = {}) {
   debug('send "%s" %j', path, opts)
   const root = opts.root ? normalize(resolve(opts.root)) : ''
   const trailingSlash = path[path.length - 1] === '/'
-  path = path.substr(parse(path).root.length)
   const index = opts.index
   const maxage = opts.maxage || opts.maxAge || 0
   const immutable = opts.immutable || false
@@ -53,50 +52,61 @@ async function send (ctx, path, opts = {}) {
   const gzip = opts.gzip !== false
   const setHeaders = opts.setHeaders
 
+  const parsedPath = parse(path)
+  path = path.substr(parsedPath.root.length)
+
   if (setHeaders && typeof setHeaders !== 'function') {
     throw new TypeError('option setHeaders must be function')
   }
 
-  // normalize path
-  path = decode(path)
-
-  if (path === -1) return ctx.throw(400, 'failed to decode')
-
-  // index file support
-  if (index && trailingSlash) path += index
+  try {
+    // normalize path
+    path = decode(path)
+  } catch (e) {
+    return ctx.throw(400, 'failed to decode')
+  }
 
   path = resolvePath(root, path)
 
-  // hidden file support, ignore
-  if (!hidden && isHidden(root, path)) return
+  // index file support
+  if (trailingSlash) {
+    if (index) {
+      path = resolve(path, index)
+    } else {
+      throw createError(404, "Not Found")
+    }
+  } else {
+    // hidden file support, ignore
+    if (!hidden && isHidden(root, path)) return
+
+    if (extensions && !await fs.exists(path)) {
+      const list = [].concat(extensions)
+      for (let i = 0; i < list.length; i++) {
+        let ext = list[i]
+        if (typeof ext !== 'string') {
+          throw new TypeError('option extensions must be array of strings or false')
+        }
+        if (!/^\./.exec(ext)) ext = '.' + ext
+        if (await fs.exists(path + ext)) {
+          path = path + ext
+          break
+        }
+      }
+    }
+  }
 
   let encodingExt = ''
   // serve brotli file when possible otherwise gzipped file when possible
-  if (ctx.acceptsEncodings('br', 'identity') === 'br' && brotli && (await fs.exists(path + '.br'))) {
+  if (brotli && ctx.acceptsEncodings('br', 'identity') === 'br' && (await fs.exists(path + '.br'))) {
     path = path + '.br'
     ctx.set('Content-Encoding', 'br')
     ctx.res.removeHeader('Content-Length')
     encodingExt = '.br'
-  } else if (ctx.acceptsEncodings('gzip', 'identity') === 'gzip' && gzip && (await fs.exists(path + '.gz'))) {
+  } else if (gzip && ctx.acceptsEncodings('gzip', 'identity') === 'gzip' && (await fs.exists(path + '.gz'))) {
     path = path + '.gz'
     ctx.set('Content-Encoding', 'gzip')
     ctx.res.removeHeader('Content-Length')
     encodingExt = '.gz'
-  }
-
-  if (extensions && !/\.[^/]*$/.exec(path)) {
-    const list = [].concat(extensions)
-    for (let i = 0; i < list.length; i++) {
-      let ext = list[i]
-      if (typeof ext !== 'string') {
-        throw new TypeError('option extensions must be array of strings or false')
-      }
-      if (!/^\./.exec(ext)) ext = '.' + ext
-      if (await fs.exists(path + ext)) {
-        path = path + ext
-        break
-      }
-    }
   }
 
   // stat
@@ -109,10 +119,10 @@ async function send (ctx, path, opts = {}) {
     // so that you can do both `/directory` and `/directory/`
     if (stats.isDirectory()) {
       if (!format) {
-        ctx.redirect(ctx.url + '/');
+        ctx.redirect(ctx.url + '/')
         return
       } else if (index) {
-        path += '/' + index
+        path = resolve(path, index)
         stats = await fs.stat(path)
       } else {
         return
@@ -170,9 +180,5 @@ function type(file, ext) {
  */
 
 function decode(path) {
-  try {
-    return decodeURIComponent(path)
-  } catch (err) {
-    return -1
-  }
+  return decodeURIComponent(path)
 }
